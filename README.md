@@ -11,7 +11,7 @@ POST http://localhost:8888/api/v1/expenses/
 ```
 
 ## Get all expenses
-### retrieves a list of all expenses
+### Retrieves a list of all expenses
 GET http://localhost:8888/api/v1/expenses/
 
 ## Update expense
