@@ -1,4 +1,5 @@
 const Expenses = require('../models/Expenses')
+const MONTHLY_LIMIT = 100
 
 exports.getAll = async (req, res) =>{
     try {
@@ -15,23 +16,6 @@ exports.getAll = async (req, res) =>{
             message: err.message,
         })
     } 
-}
-
-exports.create = async (req, res) => {
-    try {
-        const newRecord = await Expenses.create(req.body)
-
-        res.status(201).json({
-            status: 'success',
-            message: 'created',
-            data: newRecord,
-        })
-    } catch(err) {
-        res.status(404).json({
-            status: 'failed',
-            message: err.message,
-        })
-    }
 }
 
 exports.update = async (req, res) => {
@@ -77,12 +61,7 @@ exports.getOverPeriod = async (req, res) => {
     let data = []
 
     try {
-        data = await Expenses.find({
-            createdAt: {
-                $gte: new Date(req.body.from), 
-                $lt: new Date(req.body.to),
-            }
-        })
+        data = await getExpensesOverPeriod(req.body.from, req.body.to)
     } catch(err) {
         res.status(404).json({
             status: 'failed',
@@ -97,15 +76,64 @@ exports.getOverPeriod = async (req, res) => {
 }
 
 exports.sumOverPeriod = async (req, res) => {
-    const records = await Expenses.find()
-    let total = 0
-
-    for (const record of records) {
-        total += record.amount
-    }
-
+    const records = await getExpensesOverPeriod(req.body.from, req.body.to)
+    
     res.status(200).json({
         status: 'success',
-        data: total,
+        data: {
+            total: sumExpensesOverPeriod(records)
+        },
     })
+}
+
+exports.create = async (req, res) => {
+    const monthTotal = await getMonthExpenditure(new Date(req.body.createdAt))
+  
+    if (monthTotal > MONTHLY_LIMIT)
+    {
+        res.status(403).json({
+            status: 'denied',
+            message: 'limit reached',
+        })
+
+        return
+    }
+
+    try {
+        const newRecord = await Expenses.create(req.body)
+
+        res.status(201).json({
+            status: 'success',
+            message: 'created',
+            data: newRecord,
+        })
+    } catch(err) {
+        res.status(404).json({
+            status: 'failed',
+            message: err.message,
+        })
+    }
+}
+
+async function getExpensesOverPeriod(from, to) {
+    return await Expenses.find({
+        createdAt: {
+            $gte: new Date(from), 
+            $lt: new Date(to),
+        }
+    })
+}
+
+function sumExpensesOverPeriod(expenses)
+{
+    return expenses.reduce((n, { amount }) => n + amount, 0)
+}
+
+async function getMonthExpenditure(checkDate) {
+    const firstDayOfMonth = new Date(checkDate.getFullYear(), checkDate.getMonth(), 1);
+    const lastDayOfMonth = new Date(checkDate.getFullYear(), checkDate.getMonth() + 1, 0);
+
+    const monthlyExpenses = await getExpensesOverPeriod(firstDayOfMonth, lastDayOfMonth)
+
+    return sumExpensesOverPeriod(monthlyExpenses)
 }
